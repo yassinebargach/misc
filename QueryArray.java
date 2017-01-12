@@ -11,44 +11,40 @@ public class QueryArray {
 
     public static void findQuery(int array[], int query[]){
 
+
         if(query.length==1){
             for(int i=0;i< array.length;i++){
                 if (array[i]==query[0]) {
                     System.out.println("Found in idex "+ i);
+                    return;
                 }
             }
             System.out.println("Not found !");
             return;
         }
 
-        HashSet<Integer> elements = new HashSet<>();
+        HashSet<Integer> elements = new HashSet<>(query.length);
         for(int i =0;i<query.length-1;i++){
             elements.add(query[i]);
 
         }
         elements.add(query[query.length-1]);
 
-        QueryHolder mySuperStructure = new QueryHolder(query);
+        QueryHolder state = new QueryHolder(query,elements.size());
         for(int i = 0 ; i < array.length;i++){
             if(!elements.contains(array[i])){
                 continue;
             }
 
-            mySuperStructure.processValue(array[i],i);
+            state.processValue(array[i],i);
 
         }
 
-        if(mySuperStructure.completed.size()==0){
+        if(state.completed == null){
             System.out.println("Not Found");
         }
         else {
-            Candidate finalCandidat = mySuperStructure.completed.get(0);
-            for(int i = 0 ; i<mySuperStructure.completed.size();i++){
-                if (finalCandidat.length>mySuperStructure.completed.get(i).length){
-                    finalCandidat = mySuperStructure.completed.get(i);
-                }
-            }
-            System.out.println("Winner is : "+finalCandidat.idxStart+ " and "+(finalCandidat.idxStart+finalCandidat.length));
+            System.out.println("Winner is : "+state.completed.idxStart+ " and "+(state.completed.idxStart+state.completed.length));
         }
 
 
@@ -59,31 +55,57 @@ public class QueryArray {
     static class QueryHolder{
         int query[];
 
-        //Todo : candidates can be more smart to avoid looping on all elements
-        List<Candidate> candidates=new ArrayList<>();
-        List<Candidate> completed=new ArrayList<>();
+
+        Map<Integer,Map<Integer,Candidate>> candidates;
+        Candidate completed;
 
 
-        public QueryHolder(int query[]) {
+        public QueryHolder(int query[], int distinctElements)
+        {
             this.query=query;
+            candidates  = new HashMap<>(distinctElements);
         }
 
         public void processValue(int value, int i) {
-            for(Iterator<Candidate> iterator = candidates.iterator();iterator.hasNext();){
-                Candidate c =iterator.next();
-                if(c.neededValue==value){
-                    if (++c.positionQuery==query.length){
-                        System.out.println("Query found between "+c.idxStart+ " and "+i );
-                        c.calculateLength(i);
-                        completed.add(c);
-                        iterator.remove();
-                    }else{
-                        c.neededValue=query[c.positionQuery];
-                    }
-                }
-            }
+
             if(value==query[0]){
-                candidates.add(new Candidate(i,query[1]));
+                Candidate candidate = new Candidate(i, query[1]);
+                Map<Integer,Candidate> needed = candidates.get(candidate.neededValue);
+                if(needed == null){
+                    needed = new HashMap<>();
+                    candidates.put(candidate.neededValue,needed);
+                }
+                needed.put(candidate.positionQuery,candidate);
+            }
+
+            Map<Integer,Candidate> needed = candidates.get(value);
+            if(needed==null || needed.size()==0) return;
+
+            for(Iterator<Map.Entry<Integer,Candidate>> it = needed.entrySet().iterator();it.hasNext();){
+                Map.Entry<Integer,Candidate> next = it.next();
+                Candidate c = next.getValue();
+                if(next.getKey()+1==query.length){
+                    System.out.println("Query found between "+c.idxStart+ " and "+i );
+                    c.calculateLength(i);
+                    if(completed == null){
+                        completed=c;
+                    }else{
+                        if(completed.length>c.length){
+                            completed=c;
+                        }
+                    }
+                    it.remove();
+                }else{
+                    it.remove();
+                    c.positionQuery++;
+                    c.neededValue=query[c.positionQuery];
+                    Map<Integer, Candidate> nextStep = candidates.get(c.neededValue);
+                    if(nextStep==null){
+                        nextStep = new HashMap<>();
+                        candidates.put(c.neededValue,nextStep);
+                    }
+                    nextStep.put(c.positionQuery,c);
+                }
             }
         }
     }
@@ -102,34 +124,6 @@ public class QueryArray {
 
         public void calculateLength(int indexEnd){
             length = indexEnd-idxStart;
-        }
-    }
-
-    static class Pair{
-        int idx,value;
-
-        public Pair(int idx, int value) {
-            this.idx = idx;
-            this.value = value;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-
-            Pair pair = (Pair) o;
-
-            if (idx != pair.idx) return false;
-            return value == pair.value;
-
-        }
-
-        @Override
-        public int hashCode() {
-            int result = idx;
-            result = 31 * result + value;
-            return result;
         }
     }
 
